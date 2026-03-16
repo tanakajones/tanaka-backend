@@ -109,6 +109,10 @@ public interface IssueRepository extends MongoRepository<Issue, String> {
 
     /**
      * Find issues by reporter with pagination
+     * Robust version: checks both ID and email to handle legacy data
      */
+    @Query("{ '$or': [ { 'reportedBy': ?0 }, { 'reportedBy': ?1 } ] }")
+    Page<Issue> findByReportedBy(String userId, String email, Pageable pageable);
+
     Page<Issue> findByReportedBy(String reportedBy, Pageable pageable);
 }

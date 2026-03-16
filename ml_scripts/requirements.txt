@@ -2,25 +2,24 @@
 # Install with: pip install -r requirements.txt
 
 # Deep Learning
-tensorflow==2.15.0
-keras==2.15.0
-ultralytics==8.1.0  # Added for YOLOv8
-kaggle==1.6.3      # Added for dataset download
+tensorflow>=2.16.1
+ultralytics>=8.2.0  # Newer YOLO version
+kaggle>=1.6.0
 
 # Machine Learning
-scikit-learn==1.4.0
-scipy==1.12.0
+scikit-learn>=1.4.0
+scipy>=1.12.0
 
 # Data Processing
-numpy==1.26.3
-pandas==2.2.0
+numpy>=1.26.0
+pandas>=2.2.0
 
 # Optimization
-ortools==9.8.3296
+ortools>=9.8.0
 
 # Image Processing
-opencv-python==4.9.0.80
-Pillow==10.2.0
+opencv-python>=4.9.0
+Pillow>=10.2.0
 
 # NLP (for text similarity)
-nltk==3.8.1
+nltk>=3.8.1

@@ -1,0 +1,11 @@
+# Core ML Dependencies (excluding TensorFlow)
+ultralytics>=8.2.0
+kaggle>=1.6.0
+scikit-learn>=1.4.0
+scipy>=1.12.0
+numpy>=1.26.0
+pandas>=2.2.0
+ortools>=9.8.0
+opencv-python>=4.9.0
+Pillow>=10.2.0
+nltk>=3.8.1

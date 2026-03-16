@@ -68,19 +68,19 @@ public class IssueController {
             issue.setConfidence(result.getConfidence());
             issue.setImagePath(result.getImagePath());
             issue.setWardId(wardId);
-            issue.setWardId(wardId);
 
-            // Set reportedBy from authenticated user if not provided
-            if (reportedBy == null) {
-                org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
-                        .getContext().getAuthentication();
-                if (authentication != null
-                        && authentication.getPrincipal() instanceof com.urban.settlement.model.User) {
-                    com.urban.settlement.model.User user = (com.urban.settlement.model.User) authentication
-                            .getPrincipal();
-                    reportedBy = user.getId();
-                }
+            // Always set reportedBy from authenticated user for security
+            org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            if (authentication != null
+                    && authentication.getPrincipal() instanceof com.urban.settlement.model.User) {
+                com.urban.settlement.model.User user = (com.urban.settlement.model.User) authentication
+                        .getPrincipal();
+                reportedBy = user.getId();
+            } else if (authentication != null) {
+                reportedBy = authentication.getName();
             }
+            
             issue.setReportedBy(reportedBy);
 
             Issue savedIssue = issueService.createIssue(issue);
@@ -132,18 +132,22 @@ public class IssueController {
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
         String userId = null;
+        String email = null;
+        
         if (auth != null && auth.getPrincipal() instanceof com.urban.settlement.model.User) {
-            userId = ((com.urban.settlement.model.User) auth.getPrincipal()).getId();
+            com.urban.settlement.model.User user = (com.urban.settlement.model.User) auth.getPrincipal();
+            userId = user.getId();
+            email = user.getEmail();
         } else if (auth != null) {
-            // Fallback for email-based principal if user object isn't directly in principal
             userId = auth.getName();
+            email = auth.getName();
         }
 
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        Page<Issue> issues = issueService.getIssuesByReporter(userId, pageable);
+        Page<Issue> issues = issueService.getIssuesByReporter(userId, email, pageable);
         return ResponseEntity.ok(issues);
     }
 

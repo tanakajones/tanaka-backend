@@ -174,8 +174,12 @@ public class IssueService {
     }
 
     /**
-     * Get issues by reporter
+     * Get issues by reporter (both ID and email)
      */
+    public Page<Issue> getIssuesByReporter(String userId, String email, Pageable pageable) {
+        return issueRepository.findByReportedBy(userId, email, pageable);
+    }
+
     public Page<Issue> getIssuesByReporter(String reportedBy, Pageable pageable) {
         return issueRepository.findByReportedBy(reportedBy, pageable);
     }

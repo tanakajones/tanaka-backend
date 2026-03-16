@@ -25,6 +25,9 @@ public class PythonExecutorService {
     private static final int DEFAULT_TIMEOUT_SECONDS = 30;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @org.springframework.beans.factory.annotation.Value("${python.executable:python3}")
+    private String pythonPath;
+
     /**
      * Execute Python script and return JSON output
      * 
@@ -50,7 +53,7 @@ public class PythonExecutorService {
             throws IOException {
 
         List<String> command = new ArrayList<>();
-        command.add("python");
+        command.add(pythonPath);
         command.add(scriptPath);
         command.addAll(Arrays.asList(args));
 
@@ -123,7 +126,7 @@ public class PythonExecutorService {
             throws IOException {
 
         List<String> command = new ArrayList<>();
-        command.add("python");
+        command.add(pythonPath);
         command.add(scriptPath);
         command.addAll(Arrays.asList(args));
 
