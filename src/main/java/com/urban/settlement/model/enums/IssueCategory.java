@@ -4,5 +4,10 @@ public enum IssueCategory {
     ROAD_DAMAGE,
     DRAINAGE,
     WASTE,
-    TRAFFIC_LIGHT
+    WASTE_ORGANIC,
+    WASTE_PLASTIC,
+    WASTE_METAL,
+    WASTE_CONSTRUCTION,
+    TRAFFIC_LIGHT,
+    GOOD_ROAD
 }

@@ -42,7 +42,9 @@ public class SecurityConfiguration {
             "/webjars/**",
 //            "/lecturer/**",
             "/dataset/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/uploads/**",
+            "/api/uploads/**"
     };
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;

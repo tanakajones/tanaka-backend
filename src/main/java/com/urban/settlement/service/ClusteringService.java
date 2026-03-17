@@ -73,20 +73,70 @@ public class ClusteringService {
         // 2. Prepare JSON input for Python script
         String issuesJson = prepareIssuesJson(issues);
 
-        // 3. Execute clustering script
-        JsonNode result = pythonExecutor.executePythonScriptWithInput(
-                PYTHON_SCRIPT_PATH,
-                issuesJson);
+        try {
+            // 3. Execute clustering script
+            JsonNode result = pythonExecutor.executePythonScriptWithInput(
+                    PYTHON_SCRIPT_PATH,
+                    issuesJson);
 
-        // 4. Parse cluster results
-        List<ClusterDTO> clusters = parseClusters(result);
+            // 4. Parse cluster results
+            List<ClusterDTO> clusters = parseClusters(result);
+            
+            // 5. Update issues and save clusters
+            updateIssuesWithClusters(clusters);
+            return clusters;
+        } catch (Exception e) {
+            logger.warn("Python clustering failed, using Java-native fallback: {}", e.getMessage());
+            List<ClusterDTO> clusters = performJavaNativeClustering(issues);
+            updateIssuesWithClusters(clusters);
+            return clusters;
+        }
+    }
 
-        // 5. Update issues with groupId and save clusters
-        updateIssuesWithClusters(clusters);
+    /**
+     * Simple Java-native clustering (Centroid-based)
+     * Groups issues within 500m of each other
+     */
+    private List<ClusterDTO> performJavaNativeClustering(List<Issue> issues) {
+        List<ClusterDTO> clusters = new ArrayList<>();
+        double clusterRadiusKm = 0.5; // 500m radius
 
-        logger.info("Detected {} hotspots", clusters.size());
+        for (Issue issue : issues) {
+            boolean assigned = false;
+            for (ClusterDTO cluster : clusters) {
+                double distance = calculateDistance(
+                    issue.getLocation().getY(), issue.getLocation().getX(),
+                    cluster.getCenter().getY(), cluster.getCenter().getX());
+                
+                if (distance <= clusterRadiusKm) {
+                    cluster.getIssueIds().add(issue.getId());
+                    assigned = true;
+                    break;
+                }
+            }
 
+            if (!assigned) {
+                List<String> issueIds = new ArrayList<>();
+                issueIds.add(issue.getId());
+                clusters.add(new ClusterDTO(
+                    UUID.randomUUID().toString(),
+                    issue.getLocation(),
+                    issueIds,
+                    issue.getCategory().name(),
+                    issue.getSeverity().name(),
+                    1));
+            }
+        }
         return clusters;
+    }
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        double theta = lon1 - lon2;
+        double dist = Math.sin(Math.toRadians(lat1)) * Math.sin(Math.toRadians(lat2))
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.cos(Math.toRadians(theta));
+        dist = Math.acos(dist);
+        dist = Math.toDegrees(dist);
+        return dist * 60 * 1.1515 * 1.609344;
     }
 
     /**

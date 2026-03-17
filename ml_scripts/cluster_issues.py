@@ -121,15 +121,27 @@ def cluster_issues(issues):
         center_lat = float(np.mean(cluster_coords[:, 0]))
         center_lng = float(np.mean(cluster_coords[:, 1]))
         
-        # Get issue IDs
-        issue_ids = [issues[idx]['id'] for idx in issue_indices]
+        # Get issue IDs and severities
+        issue_ids = []
+        severity_scores = []
+        severity_map = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+        inv_severity_map = {1: "LOW", 2: "MEDIUM", 3: "HIGH", 4: "CRITICAL"}
+        
+        for idx in issue_indices:
+            issue_ids.append(issues[idx]['id'])
+            sev = issues[idx].get('severityLevel', issues[idx].get('severity', 'MEDIUM'))
+            severity_scores.append(severity_map.get(sev, 2))
         
         # Determine dominant category
         categories = [issues[idx]['category'] for idx in issue_indices]
         dominant_category = max(set(categories), key=categories.count)
         
-        # Determine dominant severity (assume HIGH for now)
-        severity_level = "HIGH"
+        # Calculate cluster severity (average)
+        avg_severity_score = int(round(np.mean(severity_scores)))
+        severity_level = inv_severity_map.get(avg_severity_score, "MEDIUM")
+        
+        # Calculate intensity for heatmap (combination of count and severity)
+        intensity = len(issue_ids) * (avg_severity_score / 2.0)
         
         # Calculate average similarity
         if len(issue_indices) > 1:
@@ -154,6 +166,7 @@ def cluster_issues(issues):
             "issueCount": len(issue_ids),
             "category": dominant_category,
             "severityLevel": severity_level,
+            "intensity": round(intensity, 2),
             "avgSimilarity": round(avg_similarity, 3)
         }
         

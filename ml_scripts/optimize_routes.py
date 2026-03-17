@@ -92,11 +92,12 @@ def calculate_cost_matrix(officers, issues):
             severity_map = {"LOW": 1.0, "MEDIUM": 0.8, "HIGH": 0.6, "CRITICAL": 0.4}
             severity_factor = severity_map.get(issue.get('severity', 'MEDIUM'), 0.8)
             
-            # Total cost (lower is better)
-            cost = (distance * 0.4 +                    # Distance weight
-                    (1 - skill_score) * 20 * 0.3 +      # Skill mismatch penalty
-                    workload_penalty * 10 * 0.2 +       # Workload penalty
-                    severity_factor * 5 * 0.1)          # Severity factor
+        # Total cost (lower is better)
+            # Weights: Proximity (0.4), Skills (0.3), Workload (0.2), Severity (0.1)
+            cost = (distance * 0.4 +                    # Proximity is key
+                    (1 - skill_score) * 20 * 0.3 +      # Skill mismatch is a significant penalty
+                    workload_penalty * 15 * 0.2 +       # Keep workload balanced
+                    severity_factor * 10 * 0.1)         # Severity gives slight priority boost
             
             cost_matrix[i][j] = cost
     
@@ -107,19 +108,19 @@ def optimize_assignment(officers, issues):
     Use Hungarian algorithm for optimal assignment
     """
     if not officers or not issues:
-        return []
+        return {}
     
     # Calculate cost matrix
     cost_matrix = calculate_cost_matrix(officers, issues)
     
     # Run Hungarian algorithm
+    # linear_sum_assignment finds the minimum weight matching in a bipartite graph
     officer_indices, issue_indices = linear_sum_assignment(cost_matrix)
     
     # Build assignments
     assignments = {}
     for officer_idx, issue_idx in zip(officer_indices, issue_indices):
         officer_id = officers[officer_idx]['id']
-        issue_id = issues[issue_idx]['id']
         
         if officer_id not in assignments:
             assignments[officer_id] = {
@@ -218,15 +219,29 @@ def main():
             optimized_route = []
             total_distance = 0.0
         
-        # Estimate duration (assume 15 min per issue + travel time)
-        estimated_duration = len(assigned_issues) * 15 + int(total_distance * 3)  # 3 min per km
+        # Estimate duration (assume 20 min per issue + travel time)
+        # Travel time: assume 40 km/h average speed in urban settlement
+        travel_time_min = (total_distance / 40.0) * 60
+        estimated_duration = len(assigned_issues) * 20 + int(travel_time_min)
+        
+        # Operational cost tracking (Simplified)
+        # Fuel cost: assume 0.1 liters per km, $1.5 per liter
+        fuel_cost = total_distance * 0.1 * 1.5
+        # Personnel cost: assume $10 per hour
+        personnel_cost = (estimated_duration / 60.0) * 10
+        total_cost = fuel_cost + personnel_cost
         
         result = {
             "officerId": officer_id,
             "assignedIssues": [issue['id'] for issue in assigned_issues],
             "optimizedRoute": optimized_route,
             "totalDistance": round(total_distance, 2),
-            "estimatedDuration": estimated_duration
+            "estimatedDuration": estimated_duration,
+            "costs": {
+                "fuel": round(fuel_cost, 2),
+                "personnel": round(personnel_cost, 2),
+                "total": round(total_cost, 2)
+            }
         }
         
         results.append(result)

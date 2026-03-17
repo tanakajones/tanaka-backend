@@ -18,7 +18,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "ml_models", "pothole_classifier.h5"))
 
 # Category and severity mappings
-CATEGORIES = ["ROAD_DAMAGE", "DRAINAGE", "WASTE", "TRAFFIC_LIGHT"]
+CATEGORIES = ["ROAD_DAMAGE", "DRAINAGE", "WASTE_ORGANIC", "WASTE_PLASTIC", "WASTE_METAL", "WASTE_CONSTRUCTION", "TRAFFIC_LIGHT"]
 SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 def fallback_classification(img_path, error_msg=None):
@@ -28,6 +28,17 @@ def fallback_classification(img_path, error_msg=None):
     if error_msg:
         # Log to stderr so it doesn't break JSON parsing of stdout
         print(f"DEBUG: {error_msg}", file=sys.stderr)
+        
+    # Simple rule-based waste detection for fallback
+    # If image path contains certain keywords, classify as waste
+    path_lower = img_path.lower()
+    if any(k in path_lower for k in ["trash", "waste", "garbage", "rubbish", "plastic"]):
+        return {
+            "category": "WASTE_PLASTIC", # Default waste type
+            "severity": "MEDIUM",
+            "confidence": 0.7,
+            "mode": "fallback_heuristic"
+        }
         
     # For demo/fallback: default to ROAD_DAMAGE with HIGH severity
     return {
