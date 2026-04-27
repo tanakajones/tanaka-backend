@@ -102,6 +102,14 @@ public class ImageClassificationService {
             category = IssueCategory.WASTE_ORGANIC;
             severity = Severity.MEDIUM;
             confidence = 0.6;
+        } else if (context.contains("sewer") || context.contains("drain") || context.contains("pipe") || context.contains("overflow")) {
+            category = IssueCategory.SEWER_REPORT;
+            severity = Severity.HIGH;
+            confidence = 0.7;
+        } else if (context.contains("robot") || context.contains("mechanical") || context.contains("automated")) {
+            category = IssueCategory.ROBOT_DAMAGE;
+            severity = Severity.CRITICAL;
+            confidence = 0.8;
         }
 
         logger.info("Java heuristic result: {} - {} (confidence: {})", category, severity, confidence);

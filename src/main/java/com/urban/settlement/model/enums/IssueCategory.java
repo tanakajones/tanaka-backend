@@ -9,5 +9,7 @@ public enum IssueCategory {
     WASTE_METAL,
     WASTE_CONSTRUCTION,
     TRAFFIC_LIGHT,
-    GOOD_ROAD
+    GOOD_ROAD,
+    ROBOT_DAMAGE,
+    SEWER_REPORT
 }

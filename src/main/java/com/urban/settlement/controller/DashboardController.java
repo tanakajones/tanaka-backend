@@ -53,4 +53,14 @@ public class DashboardController {
         List<double[]> heatmapData = dashboardService.getHeatmapData();
         return ResponseEntity.ok(heatmapData);
     }
+
+    /**
+     * GET /api/dashboard/hotspots
+     * Get grouped hotspots for advanced visualization
+     */
+    @GetMapping("/hotspots")
+    public ResponseEntity<List<DashboardService.HotspotDTO>> getHotspots() {
+        List<DashboardService.HotspotDTO> hotspots = dashboardService.getHotspots();
+        return ResponseEntity.ok(hotspots);
+    }
 }

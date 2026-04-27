@@ -135,41 +135,47 @@ public class IssueService {
      * Get issues by assigned officer
      */
     public List<Issue> getIssuesByOfficer(String officerId) {
-        return issueRepository.findByAssignedOfficerId(officerId);
+        return issueRepository.findByAssignedOfficerIdsContaining(officerId);
     }
 
     /**
      * Get pending unassigned issues
      */
     public List<Issue> getPendingUnassignedIssues() {
-        return issueRepository.findByStatusAndAssignedOfficerIdIsNull(IssueStatus.PENDING);
+        return issueRepository.findByStatusAndAssignedOfficerIdsIsEmpty(IssueStatus.PENDING);
     }
 
     @Autowired
     private OfficerService officerService;
 
     /**
-     * Assign issue to officer
+     * Assign multiple officers to an issue
      */
-    public Issue assignOfficer(String issueId, String officerId) {
+    public Issue assignOfficers(String issueId, List<String> officerIds) {
         Issue issue = getIssueById(issueId);
-        String oldOfficerId = issue.getAssignedOfficerId();
+        List<String> oldOfficerIds = issue.getAssignedOfficerIds();
 
-        // If shifting from another officer, decrement their workload
-        if (oldOfficerId != null && !oldOfficerId.equals(officerId)) {
-            officerService.decrementWorkload(oldOfficerId);
+        // Decrement workload for officers removed from the task
+        for (String oldId : oldOfficerIds) {
+            if (!officerIds.contains(oldId)) {
+                officerService.decrementWorkload(oldId);
+            }
         }
 
-        // Assign new officer and increment workload
-        issue.setAssignedOfficerId(officerId);
-        if (issue.getStatus() == IssueStatus.PENDING) {
+        // Increment workload for new officers added to the task
+        for (String newId : officerIds) {
+            if (!oldOfficerIds.contains(newId)) {
+                officerService.incrementWorkload(newId);
+            }
+        }
+
+        issue.setAssignedOfficerIds(officerIds);
+        if (issue.getStatus() == IssueStatus.PENDING && !officerIds.isEmpty()) {
             issue.setStatus(IssueStatus.IN_PROGRESS);
         }
 
         Issue saved = issueRepository.save(issue);
-        officerService.incrementWorkload(officerId);
-
-        logger.info("Assigned issue {} to officer {}", issueId, officerId);
+        logger.info("Assigned issue {} to officers {}", issueId, officerIds);
         return saved;
     }
 

@@ -102,7 +102,7 @@ public class DashboardService {
      */
     private double calculateAverageResponseTime() {
         List<Issue> assignedIssues = issueRepository.findAll().stream()
-                .filter(issue -> issue.getAssignedOfficerId() != null)
+                .filter(issue -> issue.getAssignedOfficerIds() != null && !issue.getAssignedOfficerIds().isEmpty())
                 .toList();
 
         if (assignedIssues.isEmpty()) {
@@ -173,12 +173,90 @@ public class DashboardService {
 
         return issues.stream()
                 .filter(issue -> issue.getLocation() != null)
-                .map(issue -> new double[] {
+                .map(issue -> new double[]{
                         issue.getLocation().getY(), // latitude
                         issue.getLocation().getX(), // longitude
                         getSeverityIntensity(issue.getSeverity()) // intensity
                 })
                 .toList();
+    }
+
+    /**
+     * Get grouped hotspots by category and proximity
+     */
+    public List<HotspotDTO> getHotspots() {
+        List<Issue> issues = issueRepository.findAll();
+        List<HotspotDTO> hotspots = new java.util.ArrayList<>();
+
+        // Group by category first
+        Map<IssueCategory, List<Issue>> byCategory = new HashMap<>();
+        for (Issue issue : issues) {
+            if (issue.getLocation() != null && issue.getCategory() != null) {
+                byCategory.computeIfAbsent(issue.getCategory(), k -> new java.util.ArrayList<>()).add(issue);
+            }
+        }
+
+        // For each category, find clusters within 500m
+        double radiusKm = 0.5;
+
+        for (Map.Entry<IssueCategory, List<Issue>> entry : byCategory.entrySet()) {
+            List<Issue> catIssues = entry.getValue();
+            boolean[] visited = new boolean[catIssues.size()];
+
+            for (int i = 0; i < catIssues.size(); i++) {
+                if (visited[i]) continue;
+
+                List<Issue> cluster = new java.util.ArrayList<>();
+                cluster.add(catIssues.get(i));
+                visited[i] = true;
+
+                for (int j = i + 1; j < catIssues.size(); j++) {
+                    if (visited[j]) continue;
+
+                    double dist = calculateDistance(
+                            catIssues.get(i).getLocation().getY(), catIssues.get(i).getLocation().getX(),
+                            catIssues.get(j).getLocation().getY(), catIssues.get(j).getLocation().getX()
+                    );
+
+                    if (dist <= radiusKm) {
+                        cluster.add(catIssues.get(j));
+                        visited[j] = true;
+                    }
+                }
+
+                if (cluster.size() >= 2) { // Only count as hotspot if 2+ issues
+                    double avgLat = cluster.stream().mapToDouble(iss -> iss.getLocation().getY()).average().orElse(0);
+                    double avgLng = cluster.stream().mapToDouble(iss -> iss.getLocation().getX()).average().orElse(0);
+
+                    hotspots.add(new HotspotDTO(
+                            entry.getKey().name(),
+                            avgLat,
+                            avgLng,
+                            cluster.size(),
+                            calculateDensity(cluster)
+                    ));
+                }
+            }
+        }
+
+        return hotspots;
+    }
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        double theta = lon1 - lon2;
+        double dist = Math.sin(Math.toRadians(lat1)) * Math.sin(Math.toRadians(lat2)) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.cos(Math.toRadians(theta));
+        dist = Math.acos(dist);
+        dist = Math.toDegrees(dist);
+        dist = dist * 60 * 1.1515 * 1.609344;
+        return (dist);
+    }
+
+    private double calculateDensity(List<Issue> cluster) {
+        // Intensity based on count and severity
+        return cluster.stream()
+                .mapToDouble(iss -> getSeverityIntensity(iss.getSeverity()))
+                .sum();
     }
 
     /**
@@ -215,11 +293,11 @@ public class DashboardService {
         private final Map<String, Long> issuesBySeverity;
 
         public DashboardMetricsDTO(long totalReports, long todayReports, long weekReports,
-                long monthReports, long pendingCount, long inProgressCount,
-                long resolvedCount, long rejectedCount, double avgResponseTime,
-                double avgResolutionTime, double resolutionRate,
-                double costPerResolution, Map<String, Long> issuesByCategory,
-                Map<String, Long> issuesBySeverity) {
+                                   long monthReports, long pendingCount, long inProgressCount,
+                                   long resolvedCount, long rejectedCount, double avgResponseTime,
+                                   double avgResolutionTime, double resolutionRate,
+                                   double costPerResolution, Map<String, Long> issuesByCategory,
+                                   Map<String, Long> issuesBySeverity) {
             this.totalReports = totalReports;
             this.todayReports = todayReports;
             this.weekReports = weekReports;
@@ -291,6 +369,46 @@ public class DashboardService {
 
         public Map<String, Long> getIssuesBySeverity() {
             return issuesBySeverity;
+        }
+
+    }
+
+    /**
+     * Hotspot DTO for map visualization
+     */
+    public static class HotspotDTO {
+        private final String category;
+        private final double lat;
+        private final double lng;
+        private final int issueCount;
+        private final double intensity;
+
+        public HotspotDTO(String category, double lat, double lng, int issueCount, double intensity) {
+            this.category = category;
+            this.lat = lat;
+            this.lng = lng;
+            this.issueCount = issueCount;
+            this.intensity = intensity;
+        }
+
+        public String getCategory() {
+            return category;
+        }
+
+        public double getLat() {
+            return lat;
+        }
+
+        public double getLng() {
+            return lng;
+        }
+
+        public int getIssueCount() {
+            return issueCount;
+        }
+
+        public double getIntensity() {
+            return intensity;
         }
     }
 }

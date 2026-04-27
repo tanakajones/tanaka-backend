@@ -58,9 +58,9 @@ public interface IssueRepository extends MongoRepository<Issue, String> {
     List<Issue> findBySeverity(com.urban.settlement.model.enums.Severity severity);
 
     /**
-     * Find issues by assigned officer
+     * Find issues assigned to a specific officer
      */
-    List<Issue> findByAssignedOfficerId(String officerId);
+    List<Issue> findByAssignedOfficerIdsContaining(String officerId);
 
     /**
      * Find issues by ward
@@ -68,10 +68,10 @@ public interface IssueRepository extends MongoRepository<Issue, String> {
     List<Issue> findByWardId(String wardId);
 
     /**
-     * Find pending issues without assigned officer
+     * Find pending issues without any assigned officers
      * Used for task assignment optimization
      */
-    List<Issue> findByStatusAndAssignedOfficerIdIsNull(IssueStatus status);
+    List<Issue> findByStatusAndAssignedOfficerIdsIsEmpty(IssueStatus status);
 
     /**
      * Find issues reported in date range

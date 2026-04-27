@@ -15,6 +15,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Core entity for infrastructure issue reports
@@ -73,10 +75,10 @@ public class Issue {
     private String groupId;
     
     /**
-     * Reference to assigned officer
+     * List of assigned officer identifiers
      */
     @Indexed
-    private String assignedOfficerId;
+    private List<String> assignedOfficerIds = new ArrayList<>();
     
     /**
      * AI classification confidence score (0.0 - 1.0)

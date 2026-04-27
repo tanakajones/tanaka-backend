@@ -118,6 +118,19 @@ public class TaskController {
     }
 
     /**
+     * PUT /api/tasks/{id}/notes
+     * Update task notes
+     */
+    @PutMapping("/{id}/notes")
+    public ResponseEntity<Task> updateNotes(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String notes = body.get("notes");
+        Task updated = taskService.updateNotes(id, notes);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
      * GET /api/tasks/overdue
      * Get overdue tasks
      */

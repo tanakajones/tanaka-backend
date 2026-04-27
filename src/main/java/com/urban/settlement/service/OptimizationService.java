@@ -59,6 +59,7 @@ public class OptimizationService {
      * @return List of optimized assignments
      * @throws IOException if optimization fails
      */
+    @org.springframework.transaction.annotation.Transactional
     public List<TaskAssignmentDTO> optimizeTaskAssignment(List<String> issueIds) throws IOException {
 
         logger.info("Optimizing task assignment for {} issues", issueIds.size());
@@ -66,6 +67,8 @@ public class OptimizationService {
         // 1. Fetch available officers
         List<Officer> availableOfficers = officerRepository.findByAvailabilityStatus(
                 com.urban.settlement.model.enums.AvailabilityStatus.AVAILABLE);
+
+        logger.info("Found {} available officers for task assignment", availableOfficers.size());
 
         if (availableOfficers.isEmpty()) {
             throw new IllegalStateException("No available officers for task assignment");
@@ -92,60 +95,9 @@ public class OptimizationService {
             createTasksFromAssignments(assignments);
             return assignments;
         } catch (Exception e) {
-            logger.warn("Python optimization failed, using Java-native fallback: {}", e.getMessage());
-            List<TaskAssignmentDTO> assignments = performJavaNativeOptimization(availableOfficers, issues);
-            createTasksFromAssignments(assignments);
-            return assignments;
+            logger.error("Optimization failed: {}", e.getMessage());
+            throw new RuntimeException("Optimization engine failure: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Simple Java-native task optimization (Greedy approach)
-     * Assigns each issue to the nearest eligible officer
-     */
-    private List<TaskAssignmentDTO> performJavaNativeOptimization(List<Officer> officers, List<Issue> issues) {
-        List<TaskAssignmentDTO> assignments = new ArrayList<>();
-        
-        for (Officer officer : officers) {
-            List<String> assignedIssueIds = new ArrayList<>();
-            List<RoutePoint> route = new ArrayList<>();
-            int order = 1;
-            
-            // Simple logic: Each officer takes up to 3 nearby unassigned issues
-            for (Issue issue : issues) {
-                if (issue.getStatus() == com.urban.settlement.model.enums.IssueStatus.PENDING && assignedIssueIds.size() < 3) {
-                    assignedIssueIds.add(issue.getId());
-                    route.add(new RoutePoint(
-                        issue.getLocation().getY(),
-                        issue.getLocation().getX(),
-                        order++,
-                        issue.getId()
-                    ));
-                    // Mark as temporarily assigned for this loop
-                    issue.setStatus(com.urban.settlement.model.enums.IssueStatus.IN_PROGRESS);
-                }
-            }
-
-            if (!assignedIssueIds.isEmpty()) {
-                assignments.add(new TaskAssignmentDTO(
-                    officer.getId(),
-                    assignedIssueIds,
-                    route,
-                    5.5, // Estimated distance
-                    120, // Estimated duration (mins)
-                    85.0 // Estimated cost ($)
-                ));
-            }
-        }
-        
-        // Reset status for issues (createTasksFromAssignments will set it properly)
-        for(Issue issue : issues) {
-            if (issue.getStatus() == com.urban.settlement.model.enums.IssueStatus.IN_PROGRESS) {
-                issue.setStatus(com.urban.settlement.model.enums.IssueStatus.PENDING);
-            }
-        }
-
-        return assignments;
     }
 
     /**
@@ -200,6 +152,12 @@ public class OptimizationService {
             issuesArray.add(issueNode);
         }
         root.set("issues", issuesArray);
+        
+        // Add HQ location (Harare Institute of Technology)
+        ObjectNode hqNode = objectMapper.createObjectNode();
+        hqNode.put("lat", -17.8465);
+        hqNode.put("lng", 31.0069);
+        root.set("hq", hqNode);
 
         return objectMapper.writeValueAsString(root);
     }
@@ -214,6 +172,7 @@ public class OptimizationService {
         if (assignmentsNode != null && assignmentsNode.isArray()) {
             for (JsonNode assignmentNode : assignmentsNode) {
                 String officerId = assignmentNode.get("officerId").asText();
+                String officerName = assignmentNode.has("officerName") ? assignmentNode.get("officerName").asText() : officerId;
 
                 List<String> assignedIssues = new ArrayList<>();
                 JsonNode issuesNode = assignmentNode.get("assignedIssues");
@@ -245,7 +204,7 @@ public class OptimizationService {
                 }
 
                 TaskAssignmentDTO assignment = new TaskAssignmentDTO(
-                        officerId, assignedIssues, optimizedRoute, totalDistance, estimatedDuration, totalCost);
+                        officerId, officerName, assignedIssues, optimizedRoute, totalDistance, estimatedDuration, totalCost);
 
                 assignments.add(assignment);
             }
@@ -275,7 +234,9 @@ public class OptimizationService {
                 taskRepository.save(task);
 
                 // Update issue
-                issue.setAssignedOfficerId(officer.getId());
+                if (!issue.getAssignedOfficerIds().contains(officer.getId())) {
+                    issue.getAssignedOfficerIds().add(officer.getId());
+                }
                 issue.setStatus(com.urban.settlement.model.enums.IssueStatus.IN_PROGRESS);
                 issueRepository.save(issue);
             }
@@ -291,16 +252,18 @@ public class OptimizationService {
      */
     public static class TaskAssignmentDTO {
         private final String officerId;
+        private final String officerName;
         private final List<String> assignedIssues;
         private final List<RoutePoint> optimizedRoute;
         private final double totalDistance;
         private final int estimatedDuration;
         private final double totalCost;
 
-        public TaskAssignmentDTO(String officerId, List<String> assignedIssues,
+        public TaskAssignmentDTO(String officerId, String officerName, List<String> assignedIssues,
                 List<RoutePoint> optimizedRoute, double totalDistance,
                 int estimatedDuration, double totalCost) {
             this.officerId = officerId;
+            this.officerName = officerName;
             this.assignedIssues = assignedIssues;
             this.optimizedRoute = optimizedRoute;
             this.totalDistance = totalDistance;
@@ -310,6 +273,10 @@ public class OptimizationService {
 
         public String getOfficerId() {
             return officerId;
+        }
+
+        public String getOfficerName() {
+            return officerName;
         }
 
         public List<String> getAssignedIssues() {

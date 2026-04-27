@@ -92,6 +92,15 @@ public class TaskService {
     }
 
     /**
+     * Update task notes
+     */
+    public Task updateNotes(String taskId, String notes) {
+        Task task = getTaskById(taskId);
+        task.setNotes(notes);
+        return taskRepository.save(task);
+    }
+
+    /**
      * Get tasks by issue
      */
     public List<Task> getTasksByIssue(String issueId) {

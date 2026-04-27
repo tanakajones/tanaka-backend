@@ -210,13 +210,13 @@ public class IssueController {
 
     /**
      * PUT /api/issues/{id}/assign
-     * Assign issue to officer
+     * Assign multiple officers to an issue
      */
     @PutMapping("/{id}/assign")
-    public ResponseEntity<Issue> assignOfficer(
+    public ResponseEntity<Issue> assignOfficers(
             @PathVariable String id,
-            @RequestParam String officerId) {
-        Issue updated = issueService.assignOfficer(id, officerId);
+            @RequestParam List<String> officerIds) {
+        Issue updated = issueService.assignOfficers(id, officerIds);
         return ResponseEntity.ok(updated);
     }
 

@@ -20,6 +20,7 @@ public class AuthenticationResponse {
   private Role role;
   private String email;
   private String message;
+  private String officerId;
   private Boolean isFirstTime = true;
   private Boolean isVerified = true;
   private Boolean hasTwoFactor = false;

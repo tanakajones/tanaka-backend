@@ -35,7 +35,7 @@ def predict(img_path, context=""):
         # Default response if nothing detected
         if not results or len(results[0].boxes) == 0:
             return {
-                "category": "GOOD_ROAD", # Changed from ROAD_DAMAGE to GOOD_ROAD for clarity
+                "category": "GOOD_ROAD", 
                 "severity": "LOW",
                 "confidence": 1.0,
                 "detections": 0,
@@ -46,18 +46,9 @@ def predict(img_path, context=""):
         res = results[0]
         
         # YOLOv8-seg logic
-        # Extract detections
         num_detections = len(res.boxes)
         avg_conf = float(res.boxes.conf.mean())
         
-        # Calculate total area of detections if segments are available
-        total_area_ratio = 0.0
-        if res.masks is not None:
-            # Simplified area calculation: ratio of pixels in masks
-            # In a real scenario, we'd sum mask pixels and divide by image pixels
-            # For now using a heuristic based on box sizes as proxy
-            pass
-            
         # Refined severity logic based on count and confidence
         if num_detections >= 5 or (num_detections >= 3 and avg_conf > 0.8):
             severity = "CRITICAL"
@@ -91,6 +82,12 @@ def predict(img_path, context=""):
         elif any(k in combined_context for k in ["waste", "trash", "garbage", "litter"]):
             category = "WASTE_ORGANIC"
             severity = "MEDIUM"
+        elif any(k in combined_context for k in ["sewer", "drain", "pipe", "overflow"]):
+            category = "SEWER_REPORT"
+            severity = "HIGH"
+        elif any(k in combined_context for k in ["robot", "mechanical", "automated"]):
+            category = "ROBOT_DAMAGE"
+            severity = "CRITICAL"
 
         return {
             "category": category,

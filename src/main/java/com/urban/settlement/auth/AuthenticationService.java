@@ -59,6 +59,7 @@ public class AuthenticationService {
                                 .email(user.getEmail())
                                 .accessToken(jwtToken)
                                 .refreshToken(refreshToken)
+                                .officerId(user.getOfficerId())
                                 .message("Account created successfully")
                                 .build();
         }
@@ -80,6 +81,7 @@ public class AuthenticationService {
                                 .email(user.getEmail())
                                 .accessToken(jwtToken)
                                 .refreshToken(refreshToken)
+                                .officerId(user.getOfficerId())
                                 .message("Login successful.")
                                 .build();
         }

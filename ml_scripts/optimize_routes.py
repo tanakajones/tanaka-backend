@@ -105,44 +105,76 @@ def calculate_cost_matrix(officers, issues):
 
 def optimize_assignment(officers, issues):
     """
-    Use Hungarian algorithm for optimal assignment
+    Assign ALL issues to officers using a hybrid approach:
+    1. Hungarian algorithm for optimal base 1-to-1 matching
+    2. Greedy assignment for remaining issues to nearest/most suitable officer
     """
     if not officers or not issues:
         return {}
     
+    n_officers = len(officers)
+    n_issues = len(issues)
+    
     # Calculate cost matrix
     cost_matrix = calculate_cost_matrix(officers, issues)
     
-    # Run Hungarian algorithm
-    # linear_sum_assignment finds the minimum weight matching in a bipartite graph
+    # Run Hungarian algorithm for base assignment
     officer_indices, issue_indices = linear_sum_assignment(cost_matrix)
     
-    # Build assignments
     assignments = {}
+    assigned_issue_indices = set()
+    
+    # 1. Base assignments (1-to-1)
     for officer_idx, issue_idx in zip(officer_indices, issue_indices):
         officer_id = officers[officer_idx]['id']
-        
         if officer_id not in assignments:
-            assignments[officer_id] = {
-                'officer': officers[officer_idx],
-                'issues': []
-            }
-        
+            assignments[officer_id] = {'officer': officers[officer_idx], 'issues': []}
         assignments[officer_id]['issues'].append(issues[issue_idx])
+        assigned_issue_indices.add(issue_idx)
+    
+    # 2. Assign remaining issues (if any)
+    remaining_issue_indices = [i for i in range(n_issues) if i not in assigned_issue_indices]
+    
+    for issue_idx in remaining_issue_indices:
+        # Find best officer for this issue (lowest cost in matrix)
+        # But also consider their current workload in this optimization run
+        best_officer_idx = -1
+        min_cost = float('inf')
+        
+        for o_idx in range(n_officers):
+            # Cost from matrix + significant penalty for each already assigned issue in this run
+            current_workload = len(assignments.get(officers[o_idx]['id'], {'issues': []})['issues'])
+            max_tasks = officers[o_idx].get('maxTasksPerDay', 8)
+            
+            # Skip if officer is already at capacity
+            if current_workload >= max_tasks: continue
+            
+            # Higher penalty (10.0) ensures better distribution across all available officers
+            cost = cost_matrix[o_idx][issue_idx] + (current_workload * 10.0)
+            
+            if cost < min_cost:
+                min_cost = cost
+                best_officer_idx = o_idx
+        
+        if best_officer_idx != -1:
+            officer_id = officers[best_officer_idx]['id']
+            if officer_id not in assignments:
+                assignments[officer_id] = {'officer': officers[best_officer_idx], 'issues': []}
+            assignments[officer_id]['issues'].append(issues[issue_idx])
     
     return assignments
 
-def optimize_route(officer_location, issues):
+def optimize_route(hq_location, issues):
     """
-    Optimize route using nearest neighbor heuristic
-    (Simplified version of VRP)
+    Optimize route starting from HQ, visiting all issues, and returning to HQ
+    Uses nearest neighbor heuristic
     """
     if not issues:
         return [], 0.0
     
-    # Start from officer location
-    current_lat = officer_location['lat']
-    current_lng = officer_location['lng']
+    # Start from HQ
+    current_lat = hq_location['lat']
+    current_lng = hq_location['lng']
     
     remaining_issues = issues.copy()
     route = []
@@ -185,6 +217,14 @@ def optimize_route(officer_location, issues):
         remaining_issues.pop(nearest_idx)
         order += 1
     
+    # Return to HQ
+    dist_back_to_hq = haversine_distance(
+        current_lat, current_lng,
+        hq_location['lat'],
+        hq_location['lng']
+    )
+    total_distance += dist_back_to_hq
+    
     return route, total_distance
 
 def main():
@@ -199,6 +239,7 @@ def main():
     
     officers = data.get('officers', [])
     issues = data.get('issues', [])
+    hq = data.get('hq', {"lat": -17.8465, "lng": 31.0069}) # Default to HIT HQ
     
     # Optimize assignment
     assignments = optimize_assignment(officers, issues)
@@ -209,15 +250,11 @@ def main():
         officer = assignment_data['officer']
         assigned_issues = assignment_data['issues']
         
-        # Optimize route
-        if officer.get('location'):
-            optimized_route, total_distance = optimize_route(
-                officer['location'],
-                assigned_issues
-            )
-        else:
-            optimized_route = []
-            total_distance = 0.0
+        # Optimize route starting and ending at HQ
+        optimized_route, total_distance = optimize_route(
+            hq,
+            assigned_issues
+        )
         
         # Estimate duration (assume 20 min per issue + travel time)
         # Travel time: assume 40 km/h average speed in urban settlement
@@ -233,6 +270,7 @@ def main():
         
         result = {
             "officerId": officer_id,
+            "officerName": officer.get('name', officer_id),
             "assignedIssues": [issue['id'] for issue in assigned_issues],
             "optimizedRoute": optimized_route,
             "totalDistance": round(total_distance, 2),
