@@ -91,35 +91,45 @@ public class ImageClassificationService {
         Severity severity = Severity.MEDIUM;
         double confidence = 0.5;
 
-        if (context.contains("good") || context.contains("clear") || context.contains("smooth") || context.contains("perfect")) {
+        if (context.contains("good") || context.contains("clear") || context.contains("smooth") || context.contains("perfect") || context.contains("clean")) {
             category = IssueCategory.GOOD_ROAD;
             severity = Severity.LOW;
             confidence = 0.8;
-        } else if (context.contains("pothole") || context.contains("crack") || context.contains("damage") || context.contains("broken")) {
+        } else if (context.contains("pothole") || context.contains("crack") || context.contains("damage") || context.contains("broken") || context.contains("sinkhole")) {
+            category = IssueCategory.ROAD_DAMAGE;
             severity = Severity.HIGH;
             confidence = 0.7;
-        } else if (context.contains("waste") || context.contains("trash") || context.contains("garbage") || context.contains("litter")) {
-            category = IssueCategory.WASTE_ORGANIC;
+        } else if (context.contains("waste") || context.contains("trash") || context.contains("garbage") || context.contains("litter") || context.contains("rubbish") || context.contains("dump")) {
+            category = IssueCategory.WASTE;
             severity = Severity.MEDIUM;
-            confidence = 0.6;
-        } else if (context.contains("sewer") || context.contains("drain") || context.contains("pipe") || context.contains("overflow")) {
-            category = IssueCategory.SEWER_REPORT;
+            confidence = 0.8;
+        } else if (context.contains("sewer") || context.contains("drain") || context.contains("pipe") || context.contains("overflow") || context.contains("flood") || context.contains("water")) {
+            category = IssueCategory.DRAINAGE;
             severity = Severity.HIGH;
-            confidence = 0.7;
-        } else if (context.contains("robot") || context.contains("mechanical") || context.contains("automated")) {
+            confidence = 0.8;
+        } else if (context.contains("robot") || context.contains("mechanical") || context.contains("automated") || context.contains("tech")) {
             category = IssueCategory.ROBOT_DAMAGE;
             severity = Severity.CRITICAL;
             confidence = 0.8;
         }
 
-        logger.info("Java heuristic result: {} - {} (confidence: {})", category, severity, confidence);
+        logger.info("Java heuristic result: {} - {} (confidence: {}) for file: {}", category, severity, confidence, image.getOriginalFilename());
         return new ClassificationResult(category, severity, confidence, imagePath);
     }
 
     private IssueCategory mapCategory(String categoryStr) {
+        if (categoryStr == null) return IssueCategory.ROAD_DAMAGE;
+        
         try {
-            return IssueCategory.valueOf(categoryStr);
+            // Try exact match first
+            return IssueCategory.valueOf(categoryStr.toUpperCase());
         } catch (IllegalArgumentException e) {
+            // Try fuzzy matching or common variations from Python
+            String upper = categoryStr.toUpperCase();
+            if (upper.contains("WASTE")) return IssueCategory.WASTE;
+            if (upper.contains("DRAIN") || upper.contains("SEWER")) return IssueCategory.DRAINAGE;
+            if (upper.contains("ROAD") || upper.contains("POTHOLE")) return IssueCategory.ROAD_DAMAGE;
+            
             return IssueCategory.ROAD_DAMAGE;
         }
     }

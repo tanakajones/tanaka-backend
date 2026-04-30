@@ -4,6 +4,7 @@ import com.urban.settlement.model.Issue;
 import com.urban.settlement.model.enums.IssueCategory;
 import com.urban.settlement.model.enums.IssueStatus;
 import com.urban.settlement.repository.IssueRepository;
+import com.urban.settlement.service.DashboardService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -28,30 +29,48 @@ public class ReportingController {
     @Autowired
     private IssueRepository issueRepository;
 
+    @Autowired
+    private DashboardService dashboardService;
+
     /**
      * Get summary data for reporting dashboard
      */
     @GetMapping("/summary")
     public ResponseEntity<?> getReportSummary() {
-        List<Issue> allIssues = issueRepository.findAll();
-
+        DashboardService.DashboardMetricsDTO metrics = dashboardService.getMetrics();
+        
         Map<String, Object> summary = new HashMap<>();
         
-        // Categorize by category
-        Map<String, Long> byCategory = allIssues.stream()
-                .collect(Collectors.groupingBy(i -> i.getCategory().name(), Collectors.counting()));
-        summary.put("byCategory", byCategory);
+        // Basic grouping from metrics
+        summary.put("byCategory", metrics.getIssuesByCategory());
+        summary.put("byStatus", Map.of(
+            "PENDING", metrics.getPendingCount(),
+            "IN_PROGRESS", metrics.getInProgressCount(),
+            "RESOLVED", metrics.getResolvedCount(),
+            "REJECTED", metrics.getRejectedCount()
+        ));
+        summary.put("bySeverity", metrics.getIssuesBySeverity());
+        
+        // Advanced analytics
+        summary.put("totalReports", metrics.getTotalReports());
+        summary.put("avgResponseTime", metrics.getAvgResponseTime());
+        summary.put("avgResolutionTime", metrics.getAvgResolutionTime());
+        summary.put("resolutionRate", metrics.getResolutionRate());
+        summary.put("costPerResolution", metrics.getCostPerResolution());
+        summary.put("todayReports", metrics.getTodayReports());
+        summary.put("weekReports", metrics.getWeekReports());
 
-        // Categorize by status
-        Map<String, Long> byStatus = allIssues.stream()
-                .collect(Collectors.groupingBy(i -> i.getStatus().name(), Collectors.counting()));
-        summary.put("byStatus", byStatus);
-
-        // Categorize by ward/location
+        // Categorize by ward/location (keep for map/location charts)
+        List<Issue> allIssues = issueRepository.findAll();
         Map<String, Long> byWard = allIssues.stream()
                 .filter(i -> i.getWardId() != null)
                 .collect(Collectors.groupingBy(Issue::getWardId, Collectors.counting()));
         summary.put("byWard", byWard);
+
+        // System efficiency score (custom formula)
+        double efficiency = (metrics.getResolutionRate() * 0.6) + 
+                            (Math.max(0, (48 - metrics.getAvgResolutionTime()) / 48) * 40);
+        summary.put("efficiencyScore", Math.min(100, Math.round(efficiency)));
 
         return ResponseEntity.ok(summary);
     }
