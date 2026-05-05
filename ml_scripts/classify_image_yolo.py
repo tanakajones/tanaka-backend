@@ -90,14 +90,19 @@ def predict(img_path, context=""):
             avg_conf = max(avg_conf, 0.8) # Boost confidence if context matches
 
         # Refined severity logic
-        if num_detections >= 5 or (num_detections >= 3 and avg_conf > 0.8):
+        # Consider both count and confidence, and also the category
+        if num_detections >= 4 or (num_detections >= 2 and avg_conf > 0.85):
             severity = "CRITICAL"
-        elif num_detections >= 3 or (num_detections >= 1 and avg_conf > 0.7):
+        elif num_detections >= 2 or (num_detections >= 1 and avg_conf > 0.75):
             severity = "HIGH"
         elif num_detections >= 1:
             severity = "MEDIUM"
         else:
             severity = "LOW"
+            
+        # Category-based severity boost
+        if detected_category in ["SEWER_REPORT", "ROBOT_DAMAGE"] and severity == "MEDIUM":
+            severity = "HIGH" # These categories are usually higher priority
             
         return {
             "category": detected_category,

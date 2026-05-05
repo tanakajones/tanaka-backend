@@ -92,12 +92,17 @@ def calculate_cost_matrix(officers, issues):
             severity_map = {"LOW": 1.0, "MEDIUM": 0.8, "HIGH": 0.6, "CRITICAL": 0.4}
             severity_factor = severity_map.get(issue.get('severity', 'MEDIUM'), 0.8)
             
-        # Total cost (lower is better)
-            # Weights: Proximity (0.4), Skills (0.3), Workload (0.2), Severity (0.1)
-            cost = (distance * 0.4 +                    # Proximity is key
-                    (1 - skill_score) * 20 * 0.3 +      # Skill mismatch is a significant penalty
-                    workload_penalty * 15 * 0.2 +       # Keep workload balanced
-                    severity_factor * 10 * 0.1)         # Severity gives slight priority boost
+            # Total cost (lower is better)
+            # Weights: Proximity (0.35), Skills (0.3), Workload (0.2), Performance/Strength (0.1), Severity (0.05)
+            # performance_factor: higher score = lower cost
+            performance_score = officer.get('performanceScore', 100.0)
+            performance_factor = (100.0 - performance_score) / 100.0 if performance_score > 0 else 1.0
+
+            cost = (distance * 0.35 +                    # Proximity
+                    (1 - skill_score) * 20 * 0.3 +       # Skill mismatch
+                    workload_penalty * 15 * 0.2 +        # Workload balance
+                    performance_factor * 10 * 0.1 +      # Stronger officers preferred for complex tasks
+                    severity_factor * 5 * 0.05)          # Severity priority
             
             cost_matrix[i][j] = cost
     

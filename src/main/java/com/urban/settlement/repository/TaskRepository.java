@@ -14,11 +14,12 @@ import java.util.List;
 @Repository
 public interface TaskRepository extends MongoRepository<Task, String> {
 
-    /**
-     * Find active tasks for an officer (not completed)
-     * Used for workload tracking
-     */
     List<Task> findByOfficerIdAndCompletedAtIsNull(String officerId);
+
+    /**
+     * Find all active tasks globally
+     */
+    List<Task> findByCompletedAtIsNull();
 
     /**
      * Find completed tasks for an officer

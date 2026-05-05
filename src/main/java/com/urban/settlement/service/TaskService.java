@@ -92,6 +92,22 @@ public class TaskService {
     }
 
     /**
+     * Update task status (and sync with issue status)
+     */
+    public Task updateStatus(String taskId, com.urban.settlement.model.enums.IssueStatus status) {
+        Task task = getTaskById(taskId);
+        
+        // Sync issue status
+        issueService.updateStatus(task.getIssueId(), status);
+        
+        if (status == com.urban.settlement.model.enums.IssueStatus.RESOLVED) {
+            return completeTask(taskId, task.getNotes(), task.getQualityRating());
+        }
+        
+        return taskRepository.save(task);
+    }
+
+    /**
      * Update task notes
      */
     public Task updateNotes(String taskId, String notes) {
@@ -113,6 +129,35 @@ public class TaskService {
     public List<Task> getOverdueTasks() {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
         return taskRepository.findOverdueTasks(cutoff);
+    }
+
+    /**
+     * Reset all task allocations
+     * Deletes all active tasks and returns issues to PENDING state
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void resetAllocations() {
+        List<Task> activeTasks = taskRepository.findByCompletedAtIsNull();
+        logger.info("Resetting allocations for {} active tasks", activeTasks.size());
+
+        for (Task task : activeTasks) {
+            // Reset issue status
+            issueService.updateStatus(task.getIssueId(), 
+                    com.urban.settlement.model.enums.IssueStatus.PENDING);
+            
+            // Clear officer assigned to issue (if Issue model supports multiple, we need to handle that)
+            com.urban.settlement.model.Issue issue = issueService.getIssueById(task.getIssueId());
+            issue.getAssignedOfficerIds().clear();
+            issueService.updateIssue(issue.getId(), issue);
+
+            // Decrement officer workload
+            officerService.decrementWorkload(task.getOfficerId());
+
+            // Delete task
+            taskRepository.deleteById(task.getId());
+        }
+        
+        logger.info("Successfully reset all allocations");
     }
 
     /**

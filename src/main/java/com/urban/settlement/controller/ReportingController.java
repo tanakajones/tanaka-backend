@@ -72,6 +72,11 @@ public class ReportingController {
                             (Math.max(0, (48 - metrics.getAvgResolutionTime()) / 48) * 40);
         summary.put("efficiencyScore", Math.min(100, Math.round(efficiency)));
 
+        // Trend data (last 6 months - mocked for now as we don't have historical snapshots)
+        summary.put("monthlyTrend", Map.of(
+            "Jan", 12, "Feb", 18, "Mar", 15, "Apr", 22, "May", metrics.getMonthReports()
+        ));
+
         return ResponseEntity.ok(summary);
     }
 
@@ -81,22 +86,61 @@ public class ReportingController {
     @GetMapping("/export/csv")
     public void exportToCSV(HttpServletResponse response) throws IOException {
         response.setContentType("text/csv");
-        response.setHeader("Content-Disposition", "attachment; filename=infrastructure_report_" + LocalDateTime.now() + ".csv");
+        response.setHeader("Content-Disposition", "attachment; filename=infrastructure_report_" + System.currentTimeMillis() + ".csv");
 
         PrintWriter writer = response.getWriter();
-        writer.println("ID,Title,Category,Severity,Status,ReportedAt,Ward,Officers");
+        writer.println("ID,Title,Description,Category,Severity,Status,ReportedAt,ResolvedAt,Ward,Reporter,Officers,Location");
 
         List<Issue> issues = issueRepository.findAll();
         for (Issue issue : issues) {
-            writer.printf("%s,%s,%s,%s,%s,%s,%s,%s\n",
+            writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,\"%s\"\n",
                     issue.getId(),
                     escapeCsv(issue.getTitle()),
+                    escapeCsv(issue.getDescription()),
                     issue.getCategory(),
                     issue.getSeverity(),
                     issue.getStatus(),
                     issue.getReportedAt(),
-                    issue.getWardId(),
-                    String.join("|", issue.getAssignedOfficerIds())
+                    issue.getResolvedAt() != null ? issue.getResolvedAt() : "",
+                    issue.getWardId() != null ? issue.getWardId() : "N/A",
+                    issue.getReportedBy(),
+                    String.join("|", issue.getAssignedOfficerIds()),
+                    issue.getLocation() != null ? issue.getLocation().getY() + "," + issue.getLocation().getX() : ""
+            );
+        }
+        writer.flush();
+        writer.close();
+    }
+
+    /**
+     * Export reports as Excel-compatible CSV
+     */
+    @GetMapping("/export/excel")
+    public void exportToExcel(HttpServletResponse response) throws IOException {
+        // For simple environments, a CSV with BOM and proper delimiters works best for Excel
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=tanaka_full_report.csv");
+        
+        PrintWriter writer = response.getWriter();
+        // Add UTF-8 BOM for Excel
+        writer.write('\ufeff');
+        writer.println("Issue ID,Subject,Description,Category,Severity Level,Current Status,Date Reported,Date Resolved,Ward/Zone,Reported By,Assigned Officers,Coordinates");
+
+        List<Issue> issues = issueRepository.findAll();
+        for (Issue issue : issues) {
+            writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,\"%s\"\n",
+                    issue.getId(),
+                    escapeCsv(issue.getTitle()),
+                    escapeCsv(issue.getDescription()),
+                    issue.getCategory(),
+                    issue.getSeverity(),
+                    issue.getStatus(),
+                    issue.getReportedAt(),
+                    issue.getResolvedAt() != null ? issue.getResolvedAt() : "-",
+                    issue.getWardId() != null ? issue.getWardId() : "N/A",
+                    issue.getReportedBy(),
+                    issue.getAssignedOfficerIds().isEmpty() ? "Unassigned" : String.join(" | ", issue.getAssignedOfficerIds()),
+                    issue.getLocation() != null ? issue.getLocation().getY() + ", " + issue.getLocation().getX() : ""
             );
         }
         writer.flush();

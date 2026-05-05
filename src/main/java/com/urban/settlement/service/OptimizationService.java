@@ -50,6 +50,9 @@ public class OptimizationService {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private OfficerService officerService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -65,10 +68,10 @@ public class OptimizationService {
         logger.info("Optimizing task assignment for {} issues", issueIds.size());
 
         // 1. Fetch available officers
-        List<Officer> availableOfficers = officerRepository.findByAvailabilityStatus(
-                com.urban.settlement.model.enums.AvailabilityStatus.AVAILABLE);
-
-        logger.info("Found {} available officers for task assignment", availableOfficers.size());
+        // This now includes both the Officer collection and Users with role OFFICER
+        List<Officer> availableOfficers = officerService.getAvailableOfficers();
+        
+        logger.info("Found {} consolidated available officers for task assignment", availableOfficers.size());
 
         if (availableOfficers.isEmpty()) {
             throw new IllegalStateException("No available officers for task assignment");
@@ -129,6 +132,7 @@ public class OptimizationService {
             officerNode.set("skills", skillsArray);
             officerNode.put("workload", officer.getWorkload());
             officerNode.put("maxTasksPerDay", officer.getMaxTasksPerDay());
+            officerNode.put("performanceScore", officer.getPerformanceScore() != null ? officer.getPerformanceScore() : 100.0);
 
             officersArray.add(officerNode);
         }
@@ -218,8 +222,33 @@ public class OptimizationService {
      */
     private void createTasksFromAssignments(List<TaskAssignmentDTO> assignments) {
         for (TaskAssignmentDTO assignment : assignments) {
-            Officer officer = officerRepository.findById(assignment.getOfficerId())
-                    .orElseThrow(() -> new IllegalStateException("Officer not found"));
+            String officerId = assignment.getOfficerId();
+            Officer officer;
+
+            if (officerId.startsWith("USER_")) {
+                // This is a virtual officer from the User table, let's materialize it
+                String userId = officerId.substring(5);
+                com.urban.settlement.model.User user = officerService.getUserById(userId);
+                
+                // Check if an officer already exists for this user email (safety check)
+                java.util.Optional<Officer> existing = officerRepository.findByEmail(user.getEmail());
+                if (existing.isPresent()) {
+                    officer = existing.get();
+                } else {
+                    // Create a permanent officer entity
+                    officer = new Officer();
+                    officer.setName(user.getFirstname() + " " + user.getLastname());
+                    officer.setEmail(user.getEmail());
+                    officer.setUserId(user.getId());
+                    officer.setSkills(officerService.randomizeSkillsForUser(user));
+                    officer.setAvailabilityStatus(com.urban.settlement.model.enums.AvailabilityStatus.AVAILABLE);
+                    officer = officerRepository.save(officer);
+                    logger.info("Materialized user {} into officer entity {}", user.getEmail(), officer.getId());
+                }
+            } else {
+                officer = officerRepository.findById(officerId)
+                        .orElseThrow(() -> new IllegalStateException("Officer not found: " + officerId));
+            }
 
             int routeOrder = 1;
             for (String issueId : assignment.getAssignedIssues()) {

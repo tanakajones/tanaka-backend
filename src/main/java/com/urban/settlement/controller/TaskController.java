@@ -131,6 +131,21 @@ public class TaskController {
     }
 
     /**
+     * PUT /api/tasks/{id}/status
+     * Update task status
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Task> updateStatus(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String statusStr = body.get("status");
+        com.urban.settlement.model.enums.IssueStatus status = 
+            com.urban.settlement.model.enums.IssueStatus.valueOf(statusStr);
+        Task updated = taskService.updateStatus(id, status);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
      * GET /api/tasks/overdue
      * Get overdue tasks
      */
@@ -138,5 +153,14 @@ public class TaskController {
     public ResponseEntity<List<Task>> getOverdueTasks() {
         List<Task> tasks = taskService.getOverdueTasks();
         return ResponseEntity.ok(tasks);
+    }
+    /**
+     * POST /api/tasks/reset-allocations
+     * Reset all task allocations
+     */
+    @PostMapping("/reset-allocations")
+    public ResponseEntity<Void> resetAllocations() {
+        taskService.resetAllocations();
+        return ResponseEntity.noContent().build();
     }
 }
